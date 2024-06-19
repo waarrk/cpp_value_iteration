@@ -3,7 +3,6 @@
 #include <cmath>
 #include <fstream>
 #include <stdexcept>
-#include <tuple>
 
 #include "common.hpp"
 #include "obstacle.hpp"
