@@ -32,31 +32,16 @@ void set_obstacles(Matrix2D& rewards, int size) {
   }
 }
 
-// 行動を生成する関数
-std::vector<std::tuple<int, int, int>> generate_actions() {
-  return {
-      std::make_tuple(0, 1, 0),    // 右
-      std::make_tuple(1, 0, 0),    // 下
-      std::make_tuple(0, -1, 0),   // 左
-      std::make_tuple(-1, 0, 0),   // 上
-      std::make_tuple(1, 1, 0),    // 右下
-      std::make_tuple(-1, 1, 0),   // 左下
-      std::make_tuple(1, -1, 0),   // 右上
-      std::make_tuple(-1, -1, 0),  // 左上
-      std::make_tuple(0, 0, 1),    // 時計回り
-      std::make_tuple(0, 0, -1)    // 反時計回り
-  };
-}
-
 // 与えられた状態に対して価値を計算する関数
 double calculate_value(int i, int j, int theta, double gamma,
                        const Matrix2D& rewards, const Matrix3D& values,
-                       const std::vector<std::tuple<int, int, int>>& actions,
-                       int size, int theta_size) {
+                       const std::vector<Action>& actions, int size,
+                       int theta_size) {
   double value = -1e9;
   for (const auto& action : actions) {
-    int di, dj, dtheta;
-    std::tie(di, dj, dtheta) = action;
+    int di = action.di;
+    int dj = action.dj;
+    int dtheta = action.dtheta;
     int ni = i + di;
     int nj = j + dj;
     int ntheta = (theta + dtheta + theta_size) % theta_size;
@@ -94,7 +79,7 @@ int main() {
   initialize_goal_values(values, size, theta_size);
 
   // アクションの生成
-  std::vector<std::tuple<int, int, int>> actions = generate_actions();
+  std::vector<Action> actions = generate_actions();
 
   // 値の反復計算のパラメータ設定
   double gamma = 1.0;

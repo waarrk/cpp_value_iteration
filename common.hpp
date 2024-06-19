@@ -7,6 +7,12 @@
 typedef std::vector<std::vector<double>> Matrix2D;
 typedef std::vector<std::vector<std::vector<double>>> Matrix3D;
 
+struct Action {
+  int di;
+  int dj;
+  int dtheta;
+};
+
 // 座標が範囲内にあるかどうかを確認する関数
 bool is_within_bounds(int x, int y, int size);
 
@@ -22,5 +28,8 @@ void set_goal(Matrix2D& rewards, int size);
 
 // 境界の報酬を設定する関数
 void set_boundaries(Matrix2D& rewards, int size);
+
+// 行動を生成する関数
+std::vector<Action> generate_actions();
 
 #endif

@@ -16,12 +16,6 @@ double* d_rewards;
 double* d_values;
 double* d_new_values;
 
-struct Action {
-  int di;
-  int dj;
-  int dtheta;
-};
-
 Action* d_actions;
 
 // 水たまりの報酬を設定する関数
@@ -47,22 +41,6 @@ void set_obstacles(Matrix2D& rewards, int size) {
       rewards[i][j] = -20.0;
     }
   }
-}
-
-// 行動を生成する関数
-std::vector<Action> generate_actions() {
-  return {
-      {0, 1, 0},    // 右
-      {1, 0, 0},    // 下
-      {0, -1, 0},   // 左
-      {-1, 0, 0},   // 上
-      {1, 1, 0},    // 右下
-      {-1, 1, 0},   // 左下
-      {1, -1, 0},   // 右上
-      {-1, -1, 0},  // 左上
-      {0, 0, 1},    // 時計回り
-      {0, 0, -1}    // 反時計回り
-  };
 }
 
 // CUDAカーネル関数
