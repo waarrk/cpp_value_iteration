@@ -48,6 +48,7 @@ __global__ void calculate_value_kernel(double* d_rewards, double* d_values,
   }
 }
 
+// CUDAメモリ配列の初期化関数
 void initialize_cuda_memory(const Matrix2D& rewards, const Matrix3D& values,
                             const std::vector<Action>& actions, int size,
                             int theta_size) {
@@ -78,6 +79,7 @@ void initialize_cuda_memory(const Matrix2D& rewards, const Matrix3D& values,
              cudaMemcpyHostToDevice);
 }
 
+// 価値反復を実行する関数
 void execute_value_iteration(int size, int theta_size, double gamma,
                              int max_iterations, double threshold,
                              const std::vector<Action>& actions) {
@@ -90,6 +92,7 @@ void execute_value_iteration(int size, int theta_size, double gamma,
   std::vector<double> h_new_values(size * size * theta_size);
 
   for (int iter = 0; iter < max_iterations; ++iter) {
+    // カーネル関数の呼び出し
     calculate_value_kernel<<<gridDim, blockDim>>>(
         d_rewards, d_values, d_new_values, d_actions, size, theta_size, gamma,
         actions.size());
@@ -149,6 +152,7 @@ void print_gpu_info() {
   }
 }
 
+// 結果を保存する関数
 void save_results(const std::string& filename, int size, int theta_size) {
   Matrix3D values(size, std::vector<std::vector<double>>(
                             size, std::vector<double>(theta_size)));
@@ -185,6 +189,7 @@ void save_results(const std::string& filename, int size, int theta_size) {
   }
 }
 
+// CUDAメモリを開放する関数
 void cleanup_cuda_memory() {
   cudaFree(d_rewards);
   cudaFree(d_values);
