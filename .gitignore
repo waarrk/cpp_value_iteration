@@ -30,3 +30,7 @@
 *.exe
 *.out
 *.app
+
+# VS Code
+.vscode/
+max_values.txt
