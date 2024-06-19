@@ -91,11 +91,33 @@ void initialize_cuda_memory(const Matrix2D& rewards, const Matrix3D& values,
 void execute_value_iteration(int size, int theta_size, double gamma,
                              int max_iterations, double threshold,
                              const std::vector<Action>& actions) {
-  // グリッドのサイズを設定
-  dim3 blockDim(8, 8, 8);
-  dim3 gridDim((size + blockDim.x - 1) / blockDim.x,
-               (size + blockDim.y - 1) / blockDim.y,
-               (theta_size + blockDim.z - 1) / blockDim.z);
+  // GPU0のプロパティを取得
+  cudaDeviceProp device_prop;
+  cudaGetDeviceProperties(&device_prop, 0);
+
+  // ブロックサイズを設定
+  dim3 blockDim(32, 32, 32);
+  std::cout << "Block size: " << blockDim.x << "x" << blockDim.y << "x"
+            << blockDim.z << std::endl;
+
+  // 計算に必要なグリッドサイズを計算
+  int max_blocks_x = device_prop.maxGridSize[0];
+  unsigned int max_blocks_yz = device_prop.maxGridSize[1];
+
+  // 最大グリッドサイズを超えない範囲でグリッドサイズを設定
+  int grid_dim_x = std::min(
+      max_blocks_x, static_cast<int>((size + blockDim.x - 1) / blockDim.x));
+  unsigned int grid_dim_y =
+      std::min(max_blocks_yz,
+               static_cast<unsigned int>((size + blockDim.y - 1) / blockDim.y));
+  unsigned int grid_dim_z = std::min(
+      max_blocks_yz,
+      static_cast<unsigned int>((theta_size + blockDim.z - 1) / blockDim.z));
+
+  std::cout << "Grid size: " << grid_dim_x << "x" << grid_dim_y << "x"
+            << grid_dim_z << std::endl;
+
+  dim3 gridDim(grid_dim_x, grid_dim_y, grid_dim_z);
 
   std::vector<double> h_values(size * size * theta_size);
   std::vector<double> h_new_values(size * size * theta_size);
@@ -162,6 +184,16 @@ void print_gpu_info() {
               << std::endl;
     std::cout << "Global Memory: " << device_prop.totalGlobalMem / (1 << 20)
               << " MB" << std::endl;
+    std::cout << "Shared Memory per Block: " << device_prop.sharedMemPerBlock
+              << " bytes" << std::endl;
+    std::cout << "Max Threads per Block: " << device_prop.maxThreadsPerBlock
+              << std::endl;
+    std::cout << "Max Threads Dimensions: " << device_prop.maxThreadsDim[0]
+              << " x " << device_prop.maxThreadsDim[1] << " x "
+              << device_prop.maxThreadsDim[2] << std::endl;
+    std::cout << "Max Grid Size: " << device_prop.maxGridSize[0] << " x "
+              << device_prop.maxGridSize[1] << " x "
+              << device_prop.maxGridSize[2] << std::endl;
   }
 }
 
@@ -211,7 +243,7 @@ void cleanup_cuda_memory() {
 }
 
 int main() {
-  int size = 200;           // マップサイズ設定
+  int size = 2000;          // マップサイズ設定
   int theta_size = 8;       // 各位置で進める方向の数
   double threshold = 1e-9;  // 収束判定閾値
 
