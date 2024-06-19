@@ -24,3 +24,12 @@ void initialize_arrays(Matrix2D& rewards, Matrix3D& values, int size,
   values.resize(size, std::vector<std::vector<double>>(
                           size, std::vector<double>(theta_size, -100.0)));
 }
+
+// 目標位置を設定する関数
+void set_goal(Matrix2D& rewards, int size) {
+  int goal_x = size - 11;
+  int goal_y = size - 11;
+  if (goal_x >= size || goal_y >= size)
+    throw std::out_of_range("Goal position out of bounds");
+  rewards[goal_x][goal_y] = 0.0;
+}

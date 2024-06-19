@@ -16,4 +16,8 @@ void initialize_goal_values(Matrix3D& values, int size, int theta_size);
 // 報酬と価値の配列を初期化する関数
 void initialize_arrays(Matrix2D& rewards, Matrix3D& values, int size,
                        int theta_size);
+
+// 目標位置を設定する関数
+void set_goal(Matrix2D& rewards, int size);
+
 #endif
