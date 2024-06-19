@@ -33,3 +33,13 @@ void set_goal(Matrix2D& rewards, int size) {
     throw std::out_of_range("Goal position out of bounds");
   rewards[goal_x][goal_y] = 0.0;
 }
+
+// 境界の報酬を設定する関数
+void set_boundaries(Matrix2D& rewards, int size) {
+  for (int i = 0; i < size; ++i) {
+    rewards[i][0] = -5.0;
+    rewards[i][size - 1] = -100.0;
+    rewards[0][i] = -5.0;
+    rewards[size - 1][i] = -100.0;
+  }
+}

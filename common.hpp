@@ -20,4 +20,7 @@ void initialize_arrays(Matrix2D& rewards, Matrix3D& values, int size,
 // 目標位置を設定する関数
 void set_goal(Matrix2D& rewards, int size);
 
+// 境界の報酬を設定する関数
+void set_boundaries(Matrix2D& rewards, int size);
+
 #endif

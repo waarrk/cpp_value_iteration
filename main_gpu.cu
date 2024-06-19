@@ -24,16 +24,6 @@ struct Action {
 
 Action* d_actions;
 
-// 境界の報酬を設定する関数
-void set_boundaries(Matrix2D& rewards, int size) {
-  for (int i = 0; i < size; ++i) {
-    rewards[i][0] = -5.0;
-    rewards[i][size - 1] = -100.0;
-    rewards[0][i] = -5.0;
-    rewards[size - 1][i] = -100.0;
-  }
-}
-
 // 水たまりの報酬を設定する関数
 void set_puddle(Matrix2D& rewards, int size) {
   int obstacle_end = 2 * size / 4;
