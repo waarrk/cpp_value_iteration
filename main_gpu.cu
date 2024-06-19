@@ -21,11 +21,15 @@ __global__ void calculate_value_kernel(double* d_rewards, double* d_values,
                                        double* d_new_values, Action* d_actions,
                                        int size, int theta_size, double gamma,
                                        int num_actions) {
+  // スレッドのインデックスを計算
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   int j = blockIdx.y * blockDim.y + threadIdx.y;
   int theta = blockIdx.z * blockDim.z + threadIdx.z;
+
+  // グリッドの範囲内かチェック
   if (i < size && j < size && theta < theta_size) {
     double max_value = -1e9;
+    // 各アクションに対して価値を計算
     for (int k = 0; k < num_actions; ++k) {
       int di = d_actions[k].di;
       int dj = d_actions[k].dj;
@@ -60,8 +64,11 @@ void initialize_cuda_memory(const Matrix2D& rewards, const Matrix3D& values,
   cudaMalloc(&d_new_values, num_elements * sizeof(double));
   cudaMalloc(&d_actions, actions.size() * sizeof(Action));
 
+  // ホストメモリ側要素保存場所を作成
   std::vector<double> h_rewards(reward_elements);
   std::vector<double> h_values(num_elements);
+
+  // CUDAで使用する1次元のデータ構造に変換
   for (int i = 0; i < size; ++i) {
     for (int j = 0; j < size; ++j) {
       h_rewards[i * size + j] = rewards[i][j];
@@ -71,6 +78,7 @@ void initialize_cuda_memory(const Matrix2D& rewards, const Matrix3D& values,
     }
   }
 
+  // デバイスメモリにコピー
   cudaMemcpy(d_rewards, h_rewards.data(), reward_elements * sizeof(double),
              cudaMemcpyHostToDevice);
   cudaMemcpy(d_values, h_values.data(), num_elements * sizeof(double),
@@ -83,6 +91,7 @@ void initialize_cuda_memory(const Matrix2D& rewards, const Matrix3D& values,
 void execute_value_iteration(int size, int theta_size, double gamma,
                              int max_iterations, double threshold,
                              const std::vector<Action>& actions) {
+  // グリッドのサイズを設定
   dim3 blockDim(8, 8, 8);
   dim3 gridDim((size + blockDim.x - 1) / blockDim.x,
                (size + blockDim.y - 1) / blockDim.y,
@@ -96,8 +105,11 @@ void execute_value_iteration(int size, int theta_size, double gamma,
     calculate_value_kernel<<<gridDim, blockDim>>>(
         d_rewards, d_values, d_new_values, d_actions, size, theta_size, gamma,
         actions.size());
+
+    // 同期処理
     cudaDeviceSynchronize();
 
+    // 計算結果をホストメモリにコピー
     cudaMemcpy(h_values.data(), d_values,
                size * size * theta_size * sizeof(double),
                cudaMemcpyDeviceToHost);
@@ -105,6 +117,7 @@ void execute_value_iteration(int size, int theta_size, double gamma,
                size * size * theta_size * sizeof(double),
                cudaMemcpyDeviceToHost);
 
+    // 収束判定
     double max_delta = 0.0;
     for (int i = 0; i < size; ++i) {
       for (int j = 0; j < size; ++j) {
