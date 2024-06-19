@@ -58,6 +58,29 @@ double calculate_value(int i, int j, int theta, double gamma,
   return value;
 }
 
+// 各グリッドにおいて最大の価値を計算して保存する関数
+void save_results(const std::string& filename, const Matrix3D& values, int size,
+                  int theta_size) {
+  std::ofstream outFile(filename);
+  if (outFile.is_open()) {
+    for (int i = 0; i < size; ++i) {
+      for (int j = 0; j < size; ++j) {
+        double max_value = values[i][j][0];
+        for (int theta = 1; theta < theta_size; ++theta) {
+          if (values[i][j][theta] > max_value) {
+            max_value = values[i][j][theta];
+          }
+        }
+        outFile << max_value << " ";
+      }
+      outFile << std::endl;
+    }
+    outFile.close();
+  } else {
+    std::cerr << "File cannot open" << std::endl;
+  }
+}
+
 int main() {
   int size = 200;           // マップサイズ設定
   int theta_size = 8;       // 各位置で進める方向の数
@@ -119,24 +142,7 @@ int main() {
   std::cout << "Elapsed time: " << elapsed.count() << " seconds" << std::endl;
 
   // 各グリッドにおいて最大の価値を計算して保存
-  std::ofstream outFile("max_values.txt");
-  if (outFile.is_open()) {
-    for (int i = 0; i < size; ++i) {
-      for (int j = 0; j < size; ++j) {
-        double max_value = values[i][j][0];
-        for (int theta = 1; theta < theta_size; ++theta) {
-          if (values[i][j][theta] > max_value) {
-            max_value = values[i][j][theta];
-          }
-        }
-        outFile << max_value << " ";
-      }
-      outFile << std::endl;
-    }
-    outFile.close();
-  } else {
-    std::cerr << "File cannot open" << std::endl;
-  }
+  save_results("max_values.txt", values, size, theta_size);
 
   std::cout << "Value Iteration Complete !!!" << std::endl;
   return 0;
