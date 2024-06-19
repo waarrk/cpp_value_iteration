@@ -1,5 +1,5 @@
-#ifndef IS_WITHIN_BOUNDS_HPP
-#define IS_WITHIN_BOUNDS_HPP
+#ifndef COMMON_HPP
+#define COMMON_HPP
 
 #include <iostream>
 #include <vector>
