@@ -95,29 +95,19 @@ void execute_value_iteration(int size, int theta_size, double gamma,
   cudaDeviceProp device_prop;
   cudaGetDeviceProperties(&device_prop, 0);
 
-  // ブロックサイズを設定
-  dim3 blockDim(32, 32, 32);
-  std::cout << "Block size: " << blockDim.x << "x" << blockDim.y << "x"
-            << blockDim.z << std::endl;
+  // スレッド数とブロック数を設定
+  dim3 blockDim(8, 8, 8);
 
-  // 計算に必要なグリッドサイズを計算
-  int max_blocks_x = device_prop.maxGridSize[0];
-  unsigned int max_blocks_yz = device_prop.maxGridSize[1];
-
-  // 最大グリッドサイズを超えない範囲でグリッドサイズを設定
-  int grid_dim_x = std::min(
-      max_blocks_x, static_cast<int>((size + blockDim.x - 1) / blockDim.x));
-  unsigned int grid_dim_y =
-      std::min(max_blocks_yz,
-               static_cast<unsigned int>((size + blockDim.y - 1) / blockDim.y));
-  unsigned int grid_dim_z = std::min(
-      max_blocks_yz,
-      static_cast<unsigned int>((theta_size + blockDim.z - 1) / blockDim.z));
-
-  std::cout << "Grid size: " << grid_dim_x << "x" << grid_dim_y << "x"
-            << grid_dim_z << std::endl;
+  int grid_dim_x = (size + blockDim.x - 1) / blockDim.x;
+  int grid_dim_y = (size + blockDim.y - 1) / blockDim.y;
+  int grid_dim_z = (theta_size + blockDim.z - 1) / blockDim.z;
 
   dim3 gridDim(grid_dim_x, grid_dim_y, grid_dim_z);
+
+  std::cout << "Grid Size: " << gridDim.x << " x " << gridDim.y << " x "
+            << gridDim.z << std::endl;
+  std::cout << "Block Size: " << blockDim.x << " x " << blockDim.y << " x "
+            << blockDim.z << std::endl;
 
   std::vector<double> h_values(size * size * theta_size);
   std::vector<double> h_new_values(size * size * theta_size);
