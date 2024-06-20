@@ -109,6 +109,16 @@ void execute_value_iteration(int size, int theta_size, double gamma,
   std::cout << "Block Size: " << blockDim.x << " x " << blockDim.y << " x "
             << blockDim.z << std::endl;
 
+  if (gridDim.x > device_prop.maxGridSize[0] ||
+      gridDim.y > device_prop.maxGridSize[1] ||
+      gridDim.z > device_prop.maxGridSize[2]) {
+    throw std::runtime_error("Grid size exceeds the device limit.");
+  }
+
+  if (blockDim.x * blockDim.y * blockDim.z > device_prop.maxThreadsPerBlock) {
+    throw std::runtime_error("Block size exceeds the device limit.");
+  }
+
   std::vector<double> h_values(size * size * theta_size);
   std::vector<double> h_new_values(size * size * theta_size);
 
