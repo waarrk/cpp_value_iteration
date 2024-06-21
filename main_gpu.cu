@@ -4,7 +4,9 @@
 #include <chrono>
 #include <cmath>
 #include <fstream>
+#include <iostream>
 #include <stdexcept>
+#include <vector>
 
 #include "common.hpp"
 #include "obstacle.hpp"
@@ -13,7 +15,6 @@
 double* d_rewards;
 double* d_values;
 double* d_new_values;
-
 Action* d_actions;
 
 // CUDAカーネル関数
@@ -21,15 +22,12 @@ __global__ void calculate_value_kernel(double* d_rewards, double* d_values,
                                        double* d_new_values, Action* d_actions,
                                        int size, int theta_size, double gamma,
                                        int num_actions) {
-  // スレッドのインデックスを計算
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   int j = blockIdx.y * blockDim.y + threadIdx.y;
   int theta = blockIdx.z * blockDim.z + threadIdx.z;
 
-  // グリッドの範囲内かチェック
   if (i < size && j < size && theta < theta_size) {
     double max_value = -1e9;
-    // 各アクションに対して価値を計算
     for (int k = 0; k < num_actions; ++k) {
       int di = d_actions[k].di;
       int dj = d_actions[k].dj;
@@ -64,11 +62,9 @@ void initialize_cuda_memory(const Matrix2D& rewards, const Matrix3D& values,
   cudaMalloc(&d_new_values, num_elements * sizeof(double));
   cudaMalloc(&d_actions, actions.size() * sizeof(Action));
 
-  // ホストメモリ側要素保存場所を作成
   std::vector<double> h_rewards(reward_elements);
   std::vector<double> h_values(num_elements);
 
-  // CUDAで使用する1次元のデータ構造に変換
   for (int i = 0; i < size; ++i) {
     for (int j = 0; j < size; ++j) {
       h_rewards[i * size + j] = rewards[i][j];
@@ -78,7 +74,6 @@ void initialize_cuda_memory(const Matrix2D& rewards, const Matrix3D& values,
     }
   }
 
-  // デバイスメモリにコピー
   cudaMemcpy(d_rewards, h_rewards.data(), reward_elements * sizeof(double),
              cudaMemcpyHostToDevice);
   cudaMemcpy(d_values, h_values.data(), num_elements * sizeof(double),
@@ -90,13 +85,12 @@ void initialize_cuda_memory(const Matrix2D& rewards, const Matrix3D& values,
 // 価値反復を実行する関数
 void execute_value_iteration(int size, int theta_size, double gamma,
                              int max_iterations, double threshold,
+                             int block_dim_x, int block_dim_y, int block_dim_z,
                              const std::vector<Action>& actions) {
-  // GPU0のプロパティを取得
   cudaDeviceProp device_prop;
   cudaGetDeviceProperties(&device_prop, 0);
 
-  // スレッド数とブロック数を設定
-  dim3 blockDim(8, 8, 8);
+  dim3 blockDim(block_dim_x, block_dim_y, block_dim_z);
 
   int grid_dim_x = (size + blockDim.x - 1) / blockDim.x;
   int grid_dim_y = (size + blockDim.y - 1) / blockDim.y;
@@ -123,15 +117,12 @@ void execute_value_iteration(int size, int theta_size, double gamma,
   std::vector<double> h_new_values(size * size * theta_size);
 
   for (int iter = 0; iter < max_iterations; ++iter) {
-    // カーネル関数の呼び出し
     calculate_value_kernel<<<gridDim, blockDim>>>(
         d_rewards, d_values, d_new_values, d_actions, size, theta_size, gamma,
         actions.size());
 
-    // 同期処理
     cudaDeviceSynchronize();
 
-    // 計算結果をホストメモリにコピー
     cudaMemcpy(h_values.data(), d_values,
                size * size * theta_size * sizeof(double),
                cudaMemcpyDeviceToHost);
@@ -139,7 +130,6 @@ void execute_value_iteration(int size, int theta_size, double gamma,
                size * size * theta_size * sizeof(double),
                cudaMemcpyDeviceToHost);
 
-    // 収束判定
     double max_delta = 0.0;
     for (int i = 0; i < size; ++i) {
       for (int j = 0; j < size; ++j) {
@@ -242,50 +232,53 @@ void cleanup_cuda_memory() {
   cudaFree(d_actions);
 }
 
-int main() {
-  int size = 2000;          // マップサイズ設定
-  int theta_size = 8;       // 各位置で進める方向の数
-  double threshold = 1e-9;  // 収束判定閾値
+int main(int argc, char* argv[]) {
+  if (argc != 5) {
+    std::cerr << "Usage: " << argv[0]
+              << " <size> <block_dim_x> <block_dim_y> <block_dim_z>"
+              << std::endl;
+    return 1;
+  }
+
+  int size = std::stoi(argv[1]);
+  int block_dim_x = std::stoi(argv[2]);
+  int block_dim_y = std::stoi(argv[3]);
+  int block_dim_z = std::stoi(argv[4]);
+
+  const int theta_size = 36;
+  const double threshold = 1e-9;
+  const double gamma = 1.0;
+  const int max_iterations = 1000;
 
   Matrix2D rewards;
   Matrix3D values;
 
-  // 配列の初期化
   initialize_arrays(rewards, values, size, theta_size);
 
-  // 各種設定
-  set_goal(rewards, size);        // 目標位置の設定
-  set_boundaries(rewards, size);  // 境界の設定
-  set_puddle(rewards, size);      // 水たまりの設定
-  set_obstacles(rewards, size);   // 障害物の設定
+  set_goal(rewards, size);
+  set_boundaries(rewards, size);
+  set_puddle(rewards, size);
+  set_obstacles(rewards, size);
 
-  // 目標位置の価値を初期化
   initialize_goal_values(values, size, theta_size);
 
-  // アクションの生成
   std::vector<Action> actions = generate_actions();
 
-  // CUDAメモリの初期化
   initialize_cuda_memory(rewards, values, actions, size, theta_size);
 
-  // GPUの情報を表示
   print_gpu_info();
 
-  // 計算時間の測定開始
   auto start = std::chrono::high_resolution_clock::now();
 
-  // 値の反復計算を実行
-  execute_value_iteration(size, theta_size, 1.0, 1000, threshold, actions);
+  execute_value_iteration(size, theta_size, gamma, max_iterations, threshold,
+                          block_dim_x, block_dim_y, block_dim_z, actions);
 
-  // 計算時間の測定終了
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed = end - start;
   std::cout << "Elapsed time: " << elapsed.count() << " seconds" << std::endl;
 
-  // 各グリッドにおいて最大の価値を計算して保存
   save_results("max_values.txt", size, theta_size);
 
-  // CUDAメモリのクリーンアップ
   cleanup_cuda_memory();
 
   std::cout << "Value Iteration Complete !!!" << std::endl;
