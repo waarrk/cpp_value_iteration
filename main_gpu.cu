@@ -17,6 +17,8 @@ double* d_rewards;
 double* d_values;
 double* d_new_values;
 Action* d_actions;
+double* h_rewards_pinned;
+double* h_values_pinned;
 
 // #define DEBUG
 
@@ -65,21 +67,24 @@ void initialize_cuda_memory(const Matrix2D& rewards, const Matrix3D& values,
   cudaMalloc(&d_new_values, num_elements * sizeof(double));
   cudaMalloc(&d_actions, actions.size() * sizeof(Action));
 
-  std::vector<double> h_rewards(reward_elements);
-  std::vector<double> h_values(num_elements);
+  cudaHostAlloc(&h_rewards_pinned, reward_elements * sizeof(double),
+                cudaHostAllocDefault);
+  cudaHostAlloc(&h_values_pinned, num_elements * sizeof(double),
+                cudaHostAllocDefault);
 
   for (int i = 0; i < size; ++i) {
     for (int j = 0; j < size; ++j) {
-      h_rewards[i * size + j] = rewards[i][j];
+      h_rewards_pinned[i * size + j] = rewards[i][j];
       for (int theta = 0; theta < theta_size; ++theta) {
-        h_values[(i * size + j) * theta_size + theta] = values[i][j][theta];
+        h_values_pinned[(i * size + j) * theta_size + theta] =
+            values[i][j][theta];
       }
     }
   }
 
-  cudaMemcpy(d_rewards, h_rewards.data(), reward_elements * sizeof(double),
+  cudaMemcpy(d_rewards, h_rewards_pinned, reward_elements * sizeof(double),
              cudaMemcpyHostToDevice);
-  cudaMemcpy(d_values, h_values.data(), num_elements * sizeof(double),
+  cudaMemcpy(d_values, h_values_pinned, num_elements * sizeof(double),
              cudaMemcpyHostToDevice);
   cudaMemcpy(d_actions, actions.data(), actions.size() * sizeof(Action),
              cudaMemcpyHostToDevice);
@@ -237,6 +242,8 @@ void cleanup_cuda_memory() {
   cudaFree(d_values);
   cudaFree(d_new_values);
   cudaFree(d_actions);
+  cudaFreeHost(h_rewards_pinned);
+  cudaFreeHost(h_values_pinned);
 }
 
 int main(int argc, char* argv[]) {
