@@ -136,13 +136,20 @@ void initialize_cuda_memory(const Matrix2D& rewards, const Matrix3D& values,
     }
   }
 
-  // デバイスメモリにコピー
-  cudaMemcpy(d_rewards, h_rewards_pinned, reward_elements * sizeof(double),
-             cudaMemcpyHostToDevice);
-  cudaMemcpy(d_values, h_values_pinned, num_elements * sizeof(double),
-             cudaMemcpyHostToDevice);
-  cudaMemcpy(d_actions, actions.data(), actions.size() * sizeof(Action),
-             cudaMemcpyHostToDevice);
+  cudaStream_t stream;
+  cudaStreamCreate(&stream);
+
+  // デバイスメモリにコピー（非同期）
+  cudaMemcpyAsync(d_rewards, h_rewards_pinned, reward_elements * sizeof(double),
+                  cudaMemcpyHostToDevice, stream);
+  cudaMemcpyAsync(d_values, h_values_pinned, num_elements * sizeof(double),
+                  cudaMemcpyHostToDevice, stream);
+  cudaMemcpyAsync(d_actions, actions.data(), actions.size() * sizeof(Action),
+                  cudaMemcpyHostToDevice, stream);
+
+  // ストリームの同期
+  cudaStreamSynchronize(stream);
+  cudaStreamDestroy(stream);
 }
 
 // 価値反復を実行する関数
