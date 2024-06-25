@@ -308,10 +308,10 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  int size = std::stoi(argv[1]);
-  int block_dim_x = std::stoi(argv[2]);
-  int block_dim_y = std::stoi(argv[3]);
-  int block_dim_z = std::stoi(argv[4]);
+  int size = std::atoi(argv[1]);
+  int block_dim_x = std::atoi(argv[2]);
+  int block_dim_y = std::atoi(argv[3]);
+  int block_dim_z = std::atoi(argv[4]);
 
   const int theta_size = 36;
   const double threshold = 1e-9;
