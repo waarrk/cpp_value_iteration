@@ -14,7 +14,6 @@ void initialize_goal_values(Matrix3D& values, int size, int theta_size) {
   for (int t = 0; t < theta_size; ++t) {
     values[goal_x][goal_y][t] = 0.0;
   }
-  std::cout << "Goal Init: (" << goal_x << ", " << goal_y << ")" << std::endl;
 }
 
 // 報酬と価値の配列を初期化する関数

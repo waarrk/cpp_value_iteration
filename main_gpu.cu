@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cmath>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <stdexcept>
 #include <vector>
@@ -17,11 +18,13 @@ double* d_values;
 double* d_new_values;
 Action* d_actions;
 
+// #define DEBUG
+
 // CUDAカーネル関数
-__global__ void calculate_value_kernel(double* d_rewards, double* d_values,
-                                       double* d_new_values, Action* d_actions,
-                                       int size, int theta_size, double gamma,
-                                       int num_actions) {
+_global__ void calculate_value_kernel(double* d_rewards, double* d_values,
+                                      double* d_new_values, Action* d_actions,
+                                      int size, int theta_size, double gamma,
+                                      int num_actions) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   int j = blockIdx.y * blockDim.y + threadIdx.y;
   int theta = blockIdx.z * blockDim.z + threadIdx.z;
@@ -98,10 +101,12 @@ void execute_value_iteration(int size, int theta_size, double gamma,
 
   dim3 gridDim(grid_dim_x, grid_dim_y, grid_dim_z);
 
+#ifdef DEBUG
   std::cout << "Grid Size: " << gridDim.x << " x " << gridDim.y << " x "
             << gridDim.z << std::endl;
   std::cout << "Block Size: " << blockDim.x << " x " << blockDim.y << " x "
             << blockDim.z << std::endl;
+#endif
 
   if (gridDim.x > device_prop.maxGridSize[0] ||
       gridDim.y > device_prop.maxGridSize[1] ||
@@ -142,8 +147,10 @@ void execute_value_iteration(int size, int theta_size, double gamma,
     }
 
     if (max_delta < threshold) {
+#ifdef DEBUG
       std::cout << "Converged after " << iter + 1
                 << " iterations with max delta: " << max_delta << std::endl;
+#endif
       break;
     }
 
@@ -248,7 +255,7 @@ int main(int argc, char* argv[]) {
   const int theta_size = 36;
   const double threshold = 1e-9;
   const double gamma = 1.0;
-  const int max_iterations = 1000;
+  const int max_iterations = 10000;
 
   Matrix2D rewards;
   Matrix3D values;
@@ -266,7 +273,9 @@ int main(int argc, char* argv[]) {
 
   initialize_cuda_memory(rewards, values, actions, size, theta_size);
 
+#ifdef DEBUG
   print_gpu_info();
+#endif
 
   auto start = std::chrono::high_resolution_clock::now();
 
@@ -275,12 +284,19 @@ int main(int argc, char* argv[]) {
 
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed = end - start;
-  std::cout << "Elapsed time: " << elapsed.count() << " seconds" << std::endl;
+
+  // std::cout << "Elapsed time: " << elapsed.count() << " seconds" <<
+  std::cout << std::fixed << std::setprecision(5) << elapsed.count()
+            << std::endl;
 
   save_results("max_values.txt", size, theta_size);
 
   cleanup_cuda_memory();
 
+#ifdef DEBUG
   std::cout << "Value Iteration Complete !!!" << std::endl;
+  std::cout << std::endl;
+#endif
+
   return 0;
 }
