@@ -1,4 +1,4 @@
-#include "obstacle.hpp"
+﻿#include "obstacle.hpp"
 
 // 水たまりの報酬を設定する関数
 void set_puddle(Matrix2D& rewards, int size) {

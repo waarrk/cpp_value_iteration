@@ -1,4 +1,4 @@
-#ifndef OBSTACLE_HPP
+﻿#ifndef OBSTACLE_HPP
 #define OBSTACLE_HPP
 
 #include "common.hpp"
