@@ -22,17 +22,37 @@ double* h_values_pinned;
 
 // #define DEBUG
 
+// アトミックCAS操作
+// 参考:
+// https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#atomiccas
+__device__ double atomicMaxDouble(double* address, double val) {
+  unsigned long long int* address_as_ull = (unsigned long long int*)address;
+  unsigned long long int old = *address_as_ull, assumed;
+
+  do {
+    assumed = old;
+    // 既存の値と新しい値の大きい方を選択
+    old = atomicCAS(
+        address_as_ull, assumed,
+        __double_as_longlong(fmax(val, __longlong_as_double(assumed))));
+  } while (assumed != old);
+
+  return __longlong_as_double(old);
+}
+
 // CUDAカーネル関数
 __global__ void calculate_value_kernel(double* d_rewards, double* d_values,
                                        double* d_new_values, Action* d_actions,
                                        int size, int theta_size, double gamma,
                                        int num_actions) {
+  // カーネルが計算すべきインデックスを計算
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   int j = blockIdx.y * blockDim.y + threadIdx.y;
   int theta = blockIdx.z * blockDim.z + threadIdx.z;
 
   if (i < size && j < size && theta < theta_size) {
     double max_value = -1e9;
+    // すべての行動に対して最大の価値を計算
     for (int k = 0; k < num_actions; ++k) {
       int di = d_actions[k].di;
       int dj = d_actions[k].dj;
@@ -55,6 +75,37 @@ __global__ void calculate_value_kernel(double* d_rewards, double* d_values,
   }
 }
 
+// CUDA収束判定カーネル
+__global__ void check_convergence_kernel(double* d_values, double* d_new_values,
+                                         double* d_max_delta, int size,
+                                         int theta_size) {
+  extern __shared__ double sdata[];
+  unsigned int tid = threadIdx.x;
+  unsigned int idx = blockIdx.x * blockDim.x + tid;
+
+  double max_delta = 0.0;
+
+  // すべてのインデックスに対して最大の差分を計算
+  if (idx < size * size * theta_size) {
+    max_delta = fabs(d_new_values[idx] - d_values[idx]);
+  }
+  sdata[tid] = max_delta;
+
+  __syncthreads();
+
+  // スレッドブロック内で最大の差分を計算
+  for (unsigned int s = blockDim.x / 2; s > 0; s >>= 1) {
+    if (tid < s) {
+      sdata[tid] = fmax(sdata[tid], sdata[tid + s]);
+    }
+    __syncthreads();
+  }
+
+  if (tid == 0) {
+    atomicMaxDouble(d_max_delta, sdata[0]);
+  }
+}
+
 // CUDAメモリ配列の初期化関数
 void initialize_cuda_memory(const Matrix2D& rewards, const Matrix3D& values,
                             const std::vector<Action>& actions, int size,
@@ -62,16 +113,19 @@ void initialize_cuda_memory(const Matrix2D& rewards, const Matrix3D& values,
   int num_elements = size * size * theta_size;
   int reward_elements = size * size;
 
+  // デバイスメモリを確保
   cudaMalloc(&d_rewards, reward_elements * sizeof(double));
   cudaMalloc(&d_values, num_elements * sizeof(double));
   cudaMalloc(&d_new_values, num_elements * sizeof(double));
   cudaMalloc(&d_actions, actions.size() * sizeof(Action));
 
+  // ホストメモリをピン
   cudaHostAlloc(&h_rewards_pinned, reward_elements * sizeof(double),
                 cudaHostAllocDefault);
   cudaHostAlloc(&h_values_pinned, num_elements * sizeof(double),
                 cudaHostAllocDefault);
 
+  // ピンメモリにデータをコピー
   for (int i = 0; i < size; ++i) {
     for (int j = 0; j < size; ++j) {
       h_rewards_pinned[i * size + j] = rewards[i][j];
@@ -82,6 +136,7 @@ void initialize_cuda_memory(const Matrix2D& rewards, const Matrix3D& values,
     }
   }
 
+  // デバイスメモリにコピー
   cudaMemcpy(d_rewards, h_rewards_pinned, reward_elements * sizeof(double),
              cudaMemcpyHostToDevice);
   cudaMemcpy(d_values, h_values_pinned, num_elements * sizeof(double),
@@ -99,19 +154,10 @@ void execute_value_iteration(int size, int theta_size, double gamma,
   cudaGetDeviceProperties(&device_prop, 0);
 
   dim3 blockDim(block_dim_x, block_dim_y, block_dim_z);
-
   int grid_dim_x = (size + blockDim.x - 1) / blockDim.x;
   int grid_dim_y = (size + blockDim.y - 1) / blockDim.y;
   int grid_dim_z = (theta_size + blockDim.z - 1) / blockDim.z;
-
   dim3 gridDim(grid_dim_x, grid_dim_y, grid_dim_z);
-
-#ifdef DEBUG
-  std::cout << "Grid Size: " << gridDim.x << " x " << gridDim.y << " x "
-            << gridDim.z << std::endl;
-  std::cout << "Block Size: " << blockDim.x << " x " << blockDim.y << " x "
-            << blockDim.z << std::endl;
-#endif
 
   if (gridDim.x > device_prop.maxGridSize[0] ||
       gridDim.y > device_prop.maxGridSize[1] ||
@@ -123,46 +169,44 @@ void execute_value_iteration(int size, int theta_size, double gamma,
     throw std::runtime_error("Block size exceeds the device limit.");
   }
 
-  std::vector<double> h_values(size * size * theta_size);
-  std::vector<double> h_new_values(size * size * theta_size);
+  double* d_max_delta;
+  cudaMalloc(&d_max_delta, sizeof(double));
 
   for (int iter = 0; iter < max_iterations; ++iter) {
+    // 価値を計算
     calculate_value_kernel<<<gridDim, blockDim>>>(
         d_rewards, d_values, d_new_values, d_actions, size, theta_size, gamma,
         actions.size());
-
     cudaDeviceSynchronize();
 
-    cudaMemcpy(h_values.data(), d_values,
-               size * size * theta_size * sizeof(double),
-               cudaMemcpyDeviceToHost);
-    cudaMemcpy(h_new_values.data(), d_new_values,
-               size * size * theta_size * sizeof(double),
+    cudaMemset(d_max_delta, 0, sizeof(double));
+
+    // 収束判定
+    check_convergence_kernel<<<(size * size * theta_size + blockDim.x - 1) /
+                                   blockDim.x,
+                               blockDim.x, blockDim.x * sizeof(double)>>>(
+        d_values, d_new_values, d_max_delta, size, theta_size);
+    cudaDeviceSynchronize();
+
+    double h_max_delta;
+    cudaMemcpy(&h_max_delta, d_max_delta, sizeof(double),
                cudaMemcpyDeviceToHost);
 
-    double max_delta = 0.0;
-    for (int i = 0; i < size; ++i) {
-      for (int j = 0; j < size; ++j) {
-        for (int theta = 0; theta < theta_size; ++theta) {
-          int idx = (i * size + j) * theta_size + theta;
-          max_delta =
-              std::max(max_delta, std::abs(h_values[idx] - h_new_values[idx]));
-        }
-      }
-    }
-
-    if (max_delta < threshold) {
+    // 収束検知
+    if (h_max_delta < threshold) {
 #ifdef DEBUG
       std::cout << "Converged after " << iter + 1
-                << " iterations with max delta: " << max_delta << std::endl;
+                << " iterations with max delta: " << h_max_delta << std::endl;
 #endif
       break;
     }
 
-    cudaMemcpy(d_values, h_new_values.data(),
+    cudaMemcpy(d_values, d_new_values,
                size * size * theta_size * sizeof(double),
-               cudaMemcpyHostToDevice);
+               cudaMemcpyDeviceToDevice);
   }
+
+  cudaFree(d_max_delta);
 }
 
 // GPUの情報を表示する関数
@@ -292,7 +336,6 @@ int main(int argc, char* argv[]) {
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed = end - start;
 
-  // std::cout << "Elapsed time: " << elapsed.count() << " seconds" <<
   std::cout << std::fixed << std::setprecision(5) << elapsed.count()
             << std::endl;
 
