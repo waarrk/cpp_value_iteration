@@ -21,10 +21,10 @@ Action* d_actions;
 // #define DEBUG
 
 // CUDAカーネル関数
-_global__ void calculate_value_kernel(double* d_rewards, double* d_values,
-                                      double* d_new_values, Action* d_actions,
-                                      int size, int theta_size, double gamma,
-                                      int num_actions) {
+__global__ void calculate_value_kernel(double* d_rewards, double* d_values,
+                                       double* d_new_values, Action* d_actions,
+                                       int size, int theta_size, double gamma,
+                                       int num_actions) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   int j = blockIdx.y * blockDim.y + threadIdx.y;
   int theta = blockIdx.z * blockDim.z + threadIdx.z;
