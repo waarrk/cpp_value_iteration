@@ -179,41 +179,44 @@ void execute_value_iteration(int size, int theta_size, double gamma,
   double* d_max_delta;
   cudaMalloc(&d_max_delta, sizeof(double));
 
+  cudaStream_t stream;
+  cudaStreamCreate(&stream);
+
   for (int iter = 0; iter < max_iterations; ++iter) {
-    // 価値を計算
-    calculate_value_kernel<<<gridDim, blockDim>>>(
+    calculate_value_kernel<<<gridDim, blockDim, 0, stream>>>(
         d_rewards, d_values, d_new_values, d_actions, size, theta_size, gamma,
         actions.size());
-    cudaDeviceSynchronize();
+    cudaStreamSynchronize(stream);
 
-    cudaMemset(d_max_delta, 0, sizeof(double));
+    if (iter % 10 == 0) {
+      cudaMemset(d_max_delta, 0, sizeof(double));
 
-    // 収束判定
-    check_convergence_kernel<<<(size * size * theta_size + blockDim.x - 1) /
-                                   blockDim.x,
-                               blockDim.x, blockDim.x * sizeof(double)>>>(
-        d_values, d_new_values, d_max_delta, size, theta_size);
-    cudaDeviceSynchronize();
+      check_convergence_kernel<<<
+          (size * size * theta_size + blockDim.x - 1) / blockDim.x, blockDim.x,
+          blockDim.x * sizeof(double), stream>>>(d_values, d_new_values,
+                                                 d_max_delta, size, theta_size);
+      cudaStreamSynchronize(stream);
 
-    double h_max_delta;
-    cudaMemcpy(&h_max_delta, d_max_delta, sizeof(double),
-               cudaMemcpyDeviceToHost);
+      double h_max_delta;
+      cudaMemcpy(&h_max_delta, d_max_delta, sizeof(double),
+                 cudaMemcpyDeviceToHost);
 
-    // 収束検知
-    if (h_max_delta < threshold) {
+      if (h_max_delta < threshold) {
 #ifdef DEBUG
-      std::cout << "Converged after " << iter + 1
-                << " iterations with max delta: " << h_max_delta << std::endl;
+        std::cout << "Converged after " << iter + 1
+                  << " iterations with max delta: " << h_max_delta << std::endl;
 #endif
-      break;
+        break;
+      }
     }
 
-    cudaMemcpy(d_values, d_new_values,
-               size * size * theta_size * sizeof(double),
-               cudaMemcpyDeviceToDevice);
+    cudaMemcpyAsync(d_values, d_new_values,
+                    size * size * theta_size * sizeof(double),
+                    cudaMemcpyDeviceToDevice, stream);
   }
 
   cudaFree(d_max_delta);
+  cudaStreamDestroy(stream);
 }
 
 // GPUの情報を表示する関数
