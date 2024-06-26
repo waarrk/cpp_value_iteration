@@ -20,11 +20,11 @@ def plot_heatmap(data):
     plt.title('Heatmap of Maximum Values')
     plt.xlabel('X-axis')
     plt.ylabel('Y-axis')
-    plt.show()
+    plt.savefig('heatmap.png')
 
 
 # ファイルから最大の価値を読み込む
 max_values_data = load_max_values('max_values.txt')
 
 # ヒートマップをプロットする
-plot_heatmap(max_values_data)
+plot_heatmap(max_values_data)('heatmap.png', max_values_data, cmap='viridis')
