@@ -109,10 +109,9 @@ int main() {
   double gamma = 1.0;
   int max_iterations = 1000;
 
-  // CPU情報の表示
-  int num_threads = std::thread::hardware_concurrency();
+  // スレッド数を8に設定
+  int num_threads = 8;
   std::cout << "Using " << num_threads << " threads" << std::endl;
-  std::cout << "CPU cores: " << num_threads << std::endl;
 
   // 計算時間の測定開始
   auto start = std::chrono::high_resolution_clock::now();
