@@ -11,6 +11,8 @@
 #include "common.hpp"
 #include "obstacle.hpp"
 
+// #define DEBUG
+
 // 与えられた状態に対して価値を計算する関数
 double calculate_value(int i, int j, int theta, double gamma,
                        const Matrix2D& rewards, const Matrix3D& values,
@@ -117,7 +119,9 @@ int main(int argc, char* argv[]) {
   double gamma = 1.0;
   int max_iterations = 100000;
 
+#ifdef DEBUG
   std::cout << "Using " << num_threads << " threads" << std::endl;
+#endif
 
   // 計算時間の測定開始
   auto start = std::chrono::high_resolution_clock::now();
@@ -153,8 +157,10 @@ int main(int argc, char* argv[]) {
 
     values = new_values;
     if (max_delta < threshold) {
+#ifdef DEBUG
       std::cout << "Converged after " << iter + 1
                 << " iterations with max delta: " << max_delta << std::endl;
+#endif
       break;
     }
   }
@@ -162,11 +168,14 @@ int main(int argc, char* argv[]) {
   // 計算時間の測定終了
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed = end - start;
-  std::cout << "Elapsed time: " << elapsed.count() << " seconds" << std::endl;
+  std::cout << elapsed.count() << std::endl;
 
   // 各グリッドにおいて最大の価値を計算して保存
   save_results("max_values.txt", values, size, theta_size);
 
+#ifdef DEBUG
   std::cout << "Value Iteration Complete !!!" << std::endl;
+#endif
+
   return 0;
 }
