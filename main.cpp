@@ -1,8 +1,11 @@
 ﻿#include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <fstream>
+#include <iostream>
 #include <stdexcept>
+#include <vector>
 
 #include "common.hpp"
 #include "obstacle.hpp"
@@ -56,8 +59,14 @@ void save_results(const std::string& filename, const Matrix3D& values, int size,
   }
 }
 
-int main() {
-  int size = 200;           // マップサイズ設定
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    std::cerr << "Usage: " << argv[0] << " size" << std::endl;
+    return 1;
+  }
+
+  int size = std::atoi(argv[1]);
+
   int theta_size = 8;       // 各位置で進める方向の数
   double threshold = 1e-9;  // 収束判定閾値
 
@@ -81,7 +90,7 @@ int main() {
 
   // 値の反復計算のパラメータ設定
   double gamma = 1.0;
-  int max_iterations = 1000;
+  int max_iterations = 100000;
 
   // 計算時間の測定開始
   auto start = std::chrono::high_resolution_clock::now();

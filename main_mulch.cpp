@@ -1,6 +1,7 @@
 ﻿#include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
@@ -82,8 +83,15 @@ void parallel_value_iteration(int start, int end, int size, int theta_size,
   }
 }
 
-int main() {
-  int size = 200;           // マップサイズ設定
+int main(int argc, char* argv[]) {
+  if (argc != 3) {
+    std::cerr << "Usage: " << argv[0] << " size num_threads" << std::endl;
+    return 1;
+  }
+
+  int size = std::atoi(argv[1]);
+  int num_threads = std::atoi(argv[2]);
+
   int theta_size = 8;       // 各位置で進める方向の数
   double threshold = 1e-9;  // 収束判定閾値
 
@@ -107,10 +115,8 @@ int main() {
 
   // 値の反復計算のパラメータ設定
   double gamma = 1.0;
-  int max_iterations = 1000;
+  int max_iterations = 100000;
 
-  // スレッド数を8に設定
-  int num_threads = 8;
   std::cout << "Using " << num_threads << " threads" << std::endl;
 
   // 計算時間の測定開始
